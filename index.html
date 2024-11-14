@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BYD</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        @font-face {
+            font-family: 'ITC Avant Garde Gothic';
+            src: url('correct-path-to-your-font/ITCAvantGardeGothic.woff2') format('woff2'),
+                 url('correct-path-to-your-font/ITCAvantGardeGothic.woff') format('woff');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        body, #map, .leaflet-container, .leaflet-popup-content, .leaflet-control {
+            font-family: 'ITC Avant Garde Gothic', sans-serif;
+        }
+
+        .store-tooltip {
+            font-family: 'ITC Avant Garde Gothic', sans-serif;
+            font-size: 1.1em;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #e0f7fa 30%, #ffffff);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            animation: fadeIn 2s ease-in-out forwards;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            background-color: #e3f2fd;
+            padding: 10px 20px;
+            box-sizing: border-box;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        /* h1 is commented out to remove the text */
+        /* h1 {
+            color: #007bff;
+            font-size: 2.5em;
+            margin: 0;
+            opacity: 0;
+            transform: translateY(-50px);
+            animation: slideInFromTop 1s forwards ease-in-out 1s;
+        } */
+
+        #nearest-store-button {
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+            transition: background-color 0.4s, transform 0.4s;
+            opacity: 0;
+            transform: translateY(-50px);
+            animation: slideInFromTop 1s forwards ease-in-out 1.8s, pulseButton 2s infinite ease-in-out 2.5s;
+        }
+
+        #nearest-store-button:hover {
+            background-color: #0056b3;
+            transform: scale(1.15) rotate(-2deg);
+        }
+
+        #map {
+            flex-grow: 1;
+            width: 90%;
+            height: 80%;
+            margin: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transform: scale(0.9);
+            animation: mapZoomIn 1.2s forwards ease-in-out 1.5s;
+            border: 5px solid transparent;
+            transition: border 1s ease-in-out;
+        }
+
+        #map:hover {
+            transform: scale(1.03);
+            border: 5px solid #007bff;
+        }
+
+        @media (max-width: 768px) {
+            /* Adjusted font size for h1 removed since we commented out h1 */
+            #nearest-store-button {
+                padding: 10px 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #nearest-store-button {
+                padding: 8px 16px;
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideInFromTop {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes mapZoomIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes pulseButton {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        @keyframes bounceMarker {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.1);
+                opacity: 0.7;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Logo container with background */
+        .logo-container {
+            background-color: #000; /* Black background */
+            padding: 5px;
+            display: inline-block;
+            border-radius: 5px;
+        }
+        .logo {
+            width: 50px;
+            height: auto;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="header">
+        <!-- Removed the <h1> tag for BYD text -->
+        <div class="logo-container">
+            <img src="https://dam.alfuttaim.com/wps/wcm/connect/bydsilver/9825e740-af7b-4c36-ac69-5d940dee14a7/logo%403x+%281%29.png?MOD=AJPERES&amp;CACHEID=ROOTWORKSPACE.Z18_6012I2C01HBKC066EEDEN30EQ5-9825e740-af7b-4c36-ac69-5d940dee14a7-p3pC7a9" alt="Logo" class="logo">
+        </div>
+        <button id="nearest-store-button" onclick="getLocation()">Visit This Store</button>
+    </div>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+
+// Define a custom icon using divIcon to add a background
+const createCustomIcon = (imgUrl) => L.divIcon({
+    html: `<div style="background-color: black; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+               <img src="${imgUrl}" style="width: 20px; height: auto;">
+           </div>`,
+    className: '', // Clears default styling of the divIcon
+    iconSize: [60, 60], // Size of the container
+    iconAnchor: [20, 40], // Center bottom for positioning
+    popupAnchor: [0, -40] // Adjust popup position if needed
+});
+
+        // Store locations
+        const stores = [
+    {
+        "name": "BYD Showroom & Discovery Center Riyadh",
+        "lat": 24.76411223418107,
+        "lng": 46.652358399858166,
+        "url": "https://www.google.com/maps?q=24.76411223418107,46.652358399858166"
+    }
+       ];
+
+        // Initialize map
+        const map = L.map('map').setView([24.764111031780516, 46.652380332836096], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+// Add markers with bounce effect
+stores.forEach(store => {
+    // Create the custom icon for each store
+    const customIcon = createCustomIcon('https://dam.alfuttaim.com/wps/wcm/connect/bydsilver/9825e740-af7b-4c36-ac69-5d940dee14a7/logo%403x+%281%29.png?MOD=AJPERES&amp;CACHEID=ROOTWORKSPACE.Z18_6012I2C01HBKC066EEDEN30EQ5-9825e740-af7b-4c36-ac69-5d940dee14a7-p3pC7a9');
+    
+    // Add marker with custom icon and bounce animation
+    const marker = L.marker([store.lat, store.lng], { icon: customIcon }).addTo(map)
+        .bindPopup(`<strong style="color: #d62300; font-size: 1.2em;">${store.name}</strong><br><a href="${store.url}" target="_blank" style="color: #007bff;">Open in Google Maps</a>`);
+    
+    // Apply the bounce effect to the marker icon
+    marker._icon.style.animation = "bounceMarker 1s ease-out";
+});
+
+
+// Welcome popup with increased size
+const welcomePopup = L.popup()
+    .setLatLng([24.764111031780516, 46.652380332836096])
+    .setContent('<div style="font-size: 1.5em; width: 200px; padding: 20px;"><b>Welcome to BYD Showroom & Discovery Center Riyadh!</b><br>Click "Visit this Store" to get the direction.</div>')
+    .openOn(map);
+
+       function getLocation() {
+    if (navigator.geolocation) {
+        if (isSafari()) {
+            const userConsent = confirm("This site needs your location to find the nearest store. Please allow location access in the popup.");
+            if (userConsent) {
+                navigator.geolocation.getCurrentPosition(showNearestStore, handleLocationError, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                });
+            }
+        } else {
+            navigator.geolocation.getCurrentPosition(showNearestStore, handleLocationError, {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            });
+        }
+    } else {
+        alert("Geolocation is not supported by this browser.");
+    }
+}
+
+function isSafari() {
+    return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+}
+
+function handleLocationError(error) {
+    switch(error.code) {
+        case error.PERMISSION_DENIED:
+            alert("User denied the request for Geolocation.");
+            break;
+        case error.POSITION_UNAVAILABLE:
+            alert("Location information is unavailable.");
+            break;
+        case error.TIMEOUT:
+            alert("The request to get user location timed out.");
+            break;
+        case error.UNKNOWN_ERROR:
+            alert("An unknown error occurred.");
+            break;
+    }
+}
+
+        function showNearestStore(position) {
+            const userLat = position.coords.latitude;
+            const userLng = position.coords.longitude;
+            let nearestStore = null;
+            let minDistance = Infinity;
+            stores.forEach(store => {
+                const distance = getDistance(userLat, userLng, store.lat, store.lng);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestStore = store;
+                }
+            });
+            if (nearestStore) {
+        alert(`The nearest store is: ${nearestStore.name}`);
+        window.open(nearestStore.url, "_blank");
+            }
+        }
+        function getDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371; // Radius of the Earth in km
+            const dLat = deg2rad(lat2 - lat1);
+            const dLng = deg2rad(lng2 - lng1);
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+                      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c; // Distance in km
+            return distance;
+        }
+        function deg2rad(deg) {
+            return deg * (Math.PI / 180);
+        }
+    </script>
+</body>
+</html>
